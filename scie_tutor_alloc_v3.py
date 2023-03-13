@@ -1,7 +1,7 @@
 """
-SCIE1000/1100 tutor allocation program
+Universit tutor allocation program
 Created: 20/07/2022
-Modified: 07/02/2023
+Modified: 13/03/2023
 Authors: Liam Timms
 """
 from random import seed
