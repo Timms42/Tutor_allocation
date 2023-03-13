@@ -86,7 +86,7 @@ workshop_avail_df = read_excel(file_name, sheet_name='Availability',
 workshop_avail_df.fillna(value='NotAvailable', inplace=True)
 
 # Dataframe for how many workshops assigned to each tutor & tutors' experience
-workshop_num_df = read_excel('Sem 1 2023 resources\\SCIE1000_1100_availabilities.xlsx', sheet_name='Allocations',
+workshop_num_df = read_excel(file_name, sheet_name='Allocations',
                              index_col=0)
 # Replace blank values with 0 (no workshops assigned)
 workshop_num_df.fillna(value=0, inplace=True)
@@ -140,7 +140,7 @@ for w in Workshops:
             time_24 = int(time.lower().replace('pm', '')) * 100 + 1200
 
         else:
-            raise ValueError(f"Workshop {workshop} doesn't contain 'am' or 'pm'.")
+            raise ValueError(f"Workshop {workshop} time doesn't contain 'am' or 'pm'.")
 
         time_period_24.append(time_24)
 
@@ -264,10 +264,12 @@ else:
     # If do_scie1100 != 'yes' and !='no', then something has gone wrong :(
     raise ValueError('Invalid input for whether or not SCIE1100 is running this semester.')
 
-# Tutors can teach at most one workshop at a time -> sum over all workshops on same day and time <= 1
-# -> Sum over all workshops overlap with workshop w
+# Tutors can teach at most one workshop at a time -> sum over all workshops on same day that overlap with workshop w
+# If the workshops start within an hour of each other, they will overlap, provided they are on the same day
 OnePlaceAtATime = {(i, w): m.addConstr(
-    quicksum(X[i, v] for v in Overlap_workshops[w] if (i, v) in X) <= 1
+    quicksum(X[i, v] for v in Workshops if (i, v) in X
+             if abs(Workshop_time[v][0] - Workshop_time[w][0]) <= 100
+             if Workshop_day[v] == Workshop_day[w]) <= 1
 ) for i in Tutors for w in Workshops}
 
 # At most one inexperienced tutor per workshop (implies that each inexperienced tutor is paired with an experienced one)
@@ -307,9 +309,11 @@ SupertutorOverlap = {w: m.addConstr(
 
 m.optimize()
 
+# Save the results as a dataframe. For each workshop, mark the allocated tutors with an X.
 results_df = DataFrame(index=np.array(Tutors), columns=np.array(Time_slots))
 for (i, w) in X:
     if X[i, w].x > 0.9:
         results_df.loc[i, Time_slots[w]] = 'X'
 
-# results_df.to_excel('tutor_alloc_sem1_2023_v1.xlsx', sheet_name='Timetable', index=True)
+# Export the allocation dataframe to an Excel file
+results_df.to_excel('tutor_workshop_schedule.xlsx', sheet_name='Timetable', index=True)
