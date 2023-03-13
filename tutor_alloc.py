@@ -1,7 +1,7 @@
 """
-Universit tutor allocation program
+SCIE1000/1100 tutor allocation program
 Created: 20/07/2022
-Modified: 13/03/2023
+Modified: 07/02/2023
 Authors: Liam Timms
 """
 from random import seed
@@ -272,11 +272,13 @@ OnePlaceAtATime = {(i, w): m.addConstr(
              if Workshop_day[v] == Workshop_day[w]) <= 1
 ) for i in Tutors for w in Workshops}
 
-# At most one inexperienced tutor per workshop (implies that each inexperienced tutor is paired with an experienced one)
-# A tutor is inexperienced if their experience in the Excel sheet 'Allocations' = 0
-AtMostOneInexp = {(t, w): m.addConstr(
-    quicksum(X[i, w] for i in Tutors if (i, w) in X if workshop_exp_df.loc[i] == 0) <= 1)
-    for t in Time_slots for w in Workshops
+# At least one experienced tutor per workshop (assuming that there are at least two tutors per workshop)
+# A tutor is experienced if their experience in the Excel sheet 'Allocations' = 1
+# If there are workshops with only one tutor, this constraint can be edited to: "workshop_exp_df.loc[i] == 0) <= 1"
+# to allow for inexperienced tutors tutoring by themselves (unlikely)
+AtMostOneInexp = {w: m.addConstr(
+    quicksum(X[i, w] for i in Tutors if (i, w) in X if workshop_exp_df.loc[i] == 1) >= 1)
+    for w in Workshops
 }
 
 # If there are any conflicts
