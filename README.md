@@ -28,12 +28,15 @@ Spreadsheet entries
   -   Add a row for how many tutors are assigned to each workshop. Name should end in 'tutors', e.g. 'Num tutors'.
       Avoid having any other rows contain the substring 'tutors'.
 
-Spreadsheet sheet
+Spreadsheet sheets
   -   The first sheet of the Excel spreadsheet is named 'Availability' and contains
       workshop availabilities and tutor numbers.
-      The second sheet is named 'Allocations' and contains how many workshops are assigned to each tutor
-      (one column for each course), as well as tutors' experience. The experience column is labelled 'Experience'
-      and has entries 1 for experienced, and 0 otherwise.
+      
+  -   The second sheet is named 'Allocations' and contains how many workshops are assigned to each tutor
+      (one column for each course), as well as tutors' experience and gender identities.
+      The experience column is labelled 'Experience' and has entries 1 for experienced, and 0 otherwise.
+      The gender identities column is labelled 'Gender ID' and can have any entry as long as the entries are
+      consistent, e.g. all tutors identifying as male are labelled 'Male'. 
 
   -   The third sheet is named 'Conflicts'. There are two columns of entries, labelled 'Tutor 1' and 'Tutor 2'.
       Each row after that contains pairs of tutors that cannot be in the same workshop.
