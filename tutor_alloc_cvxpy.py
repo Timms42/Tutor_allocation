@@ -4,8 +4,11 @@ Created: 20/07/2022
 Modified: 14/03/2023
 Authors: Liam Timms - liam.timms@uq.edu.au
 
-INSTRUCTIONS FOR CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
+INSTRUCTIONS
+--- Installation ---
+You may need to install the packages cvxpy. Instructions for doing are on https://www.cvxpy.org/install/index.html
 
+--- The Excel spreadsheet ---
 Workshop times & column names:
   -   1st column should be called 'Full name'
   -   All other columns should be the workshop times. Workshop times are labelled "Day StartTime-EndTime Suffix"
@@ -47,7 +50,7 @@ Debugging
       "variable = {" down to the closing brace "}"
 """
 from random import seed
-from gurobipy import Model, GRB, quicksum
+import cvxpy as cp
 from pandas import DataFrame, read_excel
 import numpy as np
 from itertools import combinations
@@ -238,6 +241,10 @@ if conflicts.lower() == 'yes':
         [tutor for tutor in workshop_conflict_df.loc[k]]
         for k in workshop_conflict_df.index]
 
+# Are there any SCIE1100 workshops to schedule?
+do_scie1100 = yes_no_question("Are you scheduling SCIE1100 as well as SCIE1000? (yes/no)")
+
+# Determine weighting for gender diversity in the objective function
 weight = float(input("What is the weighting (w) for gender diverse tutoring allocations?\n"
                      "0 < w < 1 means that tutors' workshop preferences are weighted more than gender diversity."
                      " Conversely for w > 1. \n"
@@ -259,58 +266,52 @@ if abs(np.sum(N_w) - np.sum([M_i[i] for i in M_i])) > 0.1:
                      f' total number of workshops assigned to all tutors.')
 
 # --------- THE MODEL ---------
-m = Model('tutor_alloc')
 
 # --------- The variables ---------
 # X_iw=1 if tutor i is allocated to workshop w, 0 otherwise. Only create variable if tutor can take workshop.
-X_iw = {(i, w): m.addVar(vtype=GRB.BINARY) for i in Tutors for w in Workshops if P_iw[i][w] != 0}
+X_iw = {(i, w): cp.Variable(boolean=True) for i in Tutors for w in Workshops if P_iw[i][w] != 0}
 
 # Y_ijw = 1 if tutors i and j are both allocated to workshop w, 0 otherwise (for workshops that require 2 tutors)
-Y_ijw = {(i, j, w): m.addVar(vtype=GRB.BINARY) for (i, j) in combinations(Tutors, 2) for w in Workshops
+Y_ijw = {(i, j, w): cp.Variable(boolean=True) for (i, j) in combinations(Tutors, 2) for w in Workshops
          if N_w[w] == 2 if (i, w) in X_iw if (j, w) in X_iw}
 
 # Z_ijkw = 1 if tutors i, j, and k are all allocated to workshop w, 0 otherwise (for workshops that require 3 tutors)
-Z_ijkw = {(i, j, k, w): m.addVar(vtype=GRB.BINARY) for (i, j, k) in combinations(Tutors, 3) for w in Workshops
+Z_ijkw = {(i, j, k, w): cp.Variable(boolean=True) for (i, j, k) in combinations(Tutors, 3) for w in Workshops
           if N_w[w] == 3 if (i, w) in X_iw if (j, w) in X_iw if (k, w) in X_iw}
+
 # --------- The objective ---------
 # Maximise tutor preferences, trying to avoid 'if needed' allocations, with a bonus for having high average gender
 # diversity in workshop allocations.
 # Max value for sum of preferences is sum(N_w), so dividing by sum(N_w) normalises the preference term in the objective.
 # Max value for sum of gender diversity in 2-tutor workshops is the no. of workshops that require 2 tutors.
-# For 3-tutor workshops, the max value is 3 x the no. of workshops requiring 3 tutors. Dividing the appropriate terms
-# by sum(N_w==2) and 3 x sum(N_w==3) normalises them; dividing by 2 will normalise the entire gender diversity term.
-m.setObjective(
-    1 / Available / np.sum(N_w) * quicksum(P_iw[i][w] * X_iw[i, w] for i in Tutors for w in Workshops if (i, w) in X_iw)
-    + weight / (np.sum(N_w == 2) + 3 * np.sum(N_w == 3)) * (
-                quicksum(Y_ijw[i, j, w] * Div_ij[i, j] for (i, j, w) in Y_ijw)
-                + quicksum(Y_ijw[i, j, w] * Div_ij[i, j] for (i, j, w) in Y_ijw))
-    , GRB.MAXIMIZE)
+# For 3-tutor workshops, the max value is 3 x the no. of workshops requiring 3 tutors. Dividing the gender diversity
+# term by sum(N_w==2) + 3 x sum(N_w==3) then normalises the average gender diversity.
+objective = cp.Maximize(
+    1 / Available / np.sum(N_w) * sum(P_iw[i][w] * X_iw[i, w] for i in Tutors for w in Workshops if (i, w) in X_iw) \
+    + weight / (np.sum(N_w == 2) + 3 * np.sum(N_w == 3)) * (sum(Y_ijw[i, j, w] * Div_ij[i, j] for (i, j, w) in Y_ijw)
+    + sum(Y_ijw[i, j, w] * Div_ij[i, j] for (i, j, w) in Y_ijw))
+)
 
 # --------- The constraints ---------
+# Initialise list to contain all the constraints
+constraints = []
 # Each workshop must have correct number of tutors teaching it
-WorkshopsStaffed = {w: m.addConstr(quicksum(X_iw[i, w] for i in Tutors if (i, w) in X_iw) == N_w[w])
-                    for w in Workshops}
-
-# Are there any SCIE1100 workshops to schedule?
-do_scie1100 = yes_no_question("Are you scheduling SCIE1100 as well as SCIE1000? (yes/no)")
+constraints += [sum(X_iw[i, w] for i in Tutors if (i, w) in X_iw) == N_w[w] for w in Workshops]
 
 if do_scie1100.lower() == 'no':
     # Make sure each tutor is allocated the correct number of workshops for SCIE1000
     # M_i[i] will only have one element, since only SCIE1000 is being run this semester.
-    NumWorkshops = {i: m.addConstr(quicksum(X_iw[i, w] for w in Workshops if (i, w) in X_iw) == M_i[i][0])
-                    for i in Tutors}
+    constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw) == M_i[i][0] for i in Tutors]
 
 elif do_scie1100.lower() == 'yes':
     # Make sure each tutor is allocated the correct number of workshops for SCIE1000
     # M_i[i] has two elements: M_i[i][0] -> SCIE1000, M_i[i][1] -> SCIE1100
-    NumWorkshops = {i: m.addConstr(quicksum(X_iw[i, w] for w in Workshops
-                                            if (i, w) in X_iw if '1100' not in Time_slots[w]) == M_i[i][0])
-                    for i in Tutors}
+    constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw if '1100' not in Time_slots[w]) == M_i[i][0]
+                    for i in Tutors]
 
     # Make sure each tutor is allocated the correct number of workshops for SCIE1100
-    NumWorkshops1100 = {i: m.addConstr(quicksum(X_iw[i, w] for w in Workshops
-                                                if (i, w) in X_iw if '1100' in Time_slots[w]) == M_i[i][1])
-                        for i in Tutors}
+    constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw if '1100' in Time_slots[w]) == M_i[i][1]
+                    for i in Tutors]
 
 else:
     # If do_scie1100 != 'yes' and !='no', then something has gone wrong :(
@@ -318,60 +319,51 @@ else:
 
 # Tutors can teach at most one workshop at a time -> sum over all workshops on same day that overlap with workshop w
 # If the workshops start within an hour of each other, they will overlap, provided they are on the same day
-OnePlaceAtATime = {(i, w): m.addConstr(
-    quicksum(X_iw[i, v] for v in Workshops if (i, v) in X_iw
-             if abs(Workshop_time[v][0] - Workshop_time[w][0]) <= 100
-             if Workshop_day[v] == Workshop_day[w]) <= 1
-) for i in Tutors for w in Workshops}
+constraints += [sum(X_iw[i, v] for v in Workshops if (i, v) in X_iw
+                    if abs(Workshop_time[v][0] - Workshop_time[w][0]) <= 100
+                    if Workshop_day[v] == Workshop_day[w]) <= 1
+                for i in Tutors for w in Workshops]
 
 # At least one experienced tutor per workshop (assuming that there are at least two tutors per workshop)
 # A tutor is experienced if their experience in the Excel sheet 'Allocations' = 1
 # If there are workshops with only one tutor, this constraint can be edited to: "workshop_exp_df.loc[i] == 0) <= 1"
 # to allow for inexperienced tutors tutoring by themselves (unlikely)
-AtMostOneInexp = {w: m.addConstr(
-    quicksum(X_iw[i, w] for i in Tutors if (i, w) in X_iw if workshop_exp_df.loc[i]['Experience'] == 1) >= 1)
-    for w in Workshops
-}
+constraints += [sum(X_iw[i, w] for i in Tutors if (i, w) in X_iw if workshop_exp_df.loc[i]['Experience'] == 1)
+                >= 1 for w in Workshops
+                ]
 
 # If there are any conflicts
 if conflicts.lower() == 'yes':
     # Tutors with conflicts cannot teach together. Note: C_ij contains lists ij = [Tutor i, Tutor j]
-    NoConflicts = {(i, j, w): m.addConstr(X_iw[i, w] + X_iw[j, w] <= 1)
-                   for i, j in C_ij for w in Workshops if (i, w) in X_iw and (j, w) in X_iw}
+    constraints += [X_iw[i, w] + X_iw[j, w] <= 1
+                    for i, j in C_ij for w in Workshops if (i, w) in X_iw and (j, w) in X_iw]
 
 # A supertutor is ideally teaching a workshop on the first day of workshops during the week.
 # This constraint can be removed if it makes the timetable infeasible.
-SupertutorWorkshop = {i: m.addConstr(
-    quicksum(X_iw[i, w] for w in Workshops if (i, w) in X_iw if first_workshop in Time_slots[w]) >= 1
-) for i in Supertutors}
+constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw if first_workshop in Time_slots[w]) >= 1
+                for i in Supertutors]
 
 # Supertutors shouldn't teach the same workshop - inefficient use of resources
 # This constraint can be removed if it makes the timetable infeasible.
-SupertutorOverlap = {w: m.addConstr(
-    quicksum(X_iw[i, w] for i in Supertutors if (i, w) in X_iw) <= 1
-) for w in Workshops}
+constraints += [sum(X_iw[i, w] for i in Supertutors if (i, w) in X_iw) <= 1
+                for w in Workshops]
 
 # Constraints for Y_ijw and Z_ijkw
 # We want Y_ijw = 1 if and only if X_iw = X_jw = 1 (see comment at definition of Y_ijw)
-# Y_ijw must be 0 if X_iw is 0, similarly if X_jw is 0 (remember that Y_ijw is binary
-Y_upperbound = {(i, j, w):
-                    [m.addConstr(Y_ijw[i, j, w] <= X_iw[i, w]),
-                     m.addConstr(Y_ijw[i, j, w] <= X_iw[j, w])]
-                for (i, j, w) in Y_ijw}
+for (i, j, w) in Y_ijw:
+    constraints += [Y_ijw[i, j, w] <= X_iw[i, w],  # Y_ijw must be 0 if X_iw is 0 ((remember that Y_ijw is binary)
+                    Y_ijw[i, j, w] <= X_iw[j, w],  # # Y_ijw must be 0 if X_jw is 0
+                    Y_ijw[i, j, w] >= X_iw[i, w] + X_iw[j, w] - 1  # Y_ijw must be 1 if both X_iw and X_jw are 1
+                    ]
 
-# Y_ijw must be 1 if both X_iw and X_jw are 1
-Y_lowerbound = {(i, j, w): m.addConstr(Y_ijw[i, j, w] >= X_iw[i, w] + X_iw[j, w] - 1) for (i, j, w) in Y_ijw}
-
-# Z_ijkw = 1 if and only if X_iw = X_jw = X_kw = 1, i.e. all three tutors are allocated to workshop w
-Z_upperbound = {(i, j, k, w):
-                    [m.addConstr(Z_ijkw[i, j, k, w] <= X_iw[i, w]),
-                     m.addConstr(Z_ijkw[i, j, k, w] <= X_iw[j, w]),
-                     m.addConstr(Z_ijkw[i, j, k, w] <= X_iw[k, w])]
-                for (i, j, k, w) in Z_ijkw}
-
-# Z_ijkw must be 1 if X_iw, X_jw, and X_kw are all 1
-Z_lowerbound = {(i, j, k, w): m.addConstr(Z_ijkw[i, j, k, w] >= X_iw[i, w] + X_iw[j, w] + X_iw[k, w] - 2)
-                for (i, j, k, w) in Z_ijkw}
+for (i, j, k, w) in Z_ijkw:
+    # Z_ijkw must be 0 if any of X_iw, X_jw, X_kw are 0
+    constraints += [Z_ijkw[i, j, k, w] <= X_iw[i, w],
+                    Z_ijkw[i, j, k, w] <= X_iw[j, w],
+                    Z_ijkw[i, j, k, w] <= X_iw[k, w],
+                    # Z_ijkw must be 1 if X_iw, X_jw, and X_kw are all 1
+                    Z_ijkw[i, j, k, w] >= X_iw[i, w] + X_iw[j, w] + X_iw[k, w] - 2
+                    ]
 
 # ------------- Manual constraints - tutor preferences -------------
 # Tutors can be manually scheduled by using the following line of code (replace occurrences of TUTOR with tutor's name,
@@ -381,15 +373,17 @@ Z_lowerbound = {(i, j, k, w): m.addConstr(Z_ijkw[i, j, k, w] >= X_iw[i, w] + X_i
 
 # Alternatively, you can include tutors' general preferences for a specific day or time with the following line of code
 # (replace occurrences of TUTOR with tutor's name, and DETAIL with the specific day or time, e.g. 'Mon' or '8am')
-# TUTORPreference = m.addConstr(quicksum(X_iw['TUTOR', w] for w in Workshops if DETAIL in Time_slots[w]) >= 1)
+# TUTORPreference = m.addConstr(sum(X_iw['TUTOR', w] for w in Workshops if DETAIL in Time_slots[w]) >= 1)
 
-m.optimize()
-
-# Save the results as a dataframe. For each workshop, mark the allocated tutors with an X_iw.
+problem = cp.Problem(objective, constraints)
+problem.solve()
+#
+# # Save the results as a dataframe. For each workshop, mark the allocated tutors with an X_iw.
 results_df = DataFrame(index=np.array(Tutors), columns=np.array(Time_slots))
 for (i, w) in X_iw:
-    if X_iw[i, w].x > 0.9:
-        results_df.loc[i, Time_slots[w]] = 'X_iw'
+    if X_iw[i, w].value > 0.9:
+        print()
+        results_df.loc[i, Time_slots[w]] = 'X'
 
 # Export the allocation dataframe to an Excel file
-results_df.to_excel('tutor_workshop_schedule_gurobi.xlsx', sheet_name='Timetable', index=True)
+# results_df.to_excel('tutor_workshop_schedule_cvxpy.xlsx', sheet_name='Timetable', index=True)
