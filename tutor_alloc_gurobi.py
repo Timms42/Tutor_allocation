@@ -1,7 +1,6 @@
 """
 Tutor allocation program for university courses
 Created: 20/07/2022
-Modified: 14/03/2023
 Authors: Liam Timms - liam.timms@uq.edu.au
 
 INSTRUCTIONS FOR CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
@@ -48,7 +47,7 @@ Debugging
 """
 from random import seed
 from gurobipy import Model, GRB, quicksum
-from pandas import DataFrame, read_excel
+from pandas import DataFrame, read_excel, read_csv
 import numpy as np
 from itertools import combinations
 
@@ -62,7 +61,18 @@ def import_spreadsheet(fname, sname, blank_value):
     """
 
     # Read in the file as a dataframe. index_col=0 uses the 0th column (tutor names) as the row names
-    df = read_excel(fname, sheet_name=sname, index_col=0)
+    # Use read_excel() if the file extension is one of the supported extensions
+    if any([file_name.endswith(x) for x in ['xls', 'xlsx', 'xlsm', 'xlsb', 'odf', 'ods', 'odt']]):
+        df = read_excel(fname, sheet_name=sname, index_col=0)
+
+    # Use read_csv
+    elif file_name.endswith('.csv'):
+        df = read_csv(fname, sheet_name=sname, index_col=0)
+
+    else:
+        raise ValueError('The specified file is not a supported file type. Supported types are xls, xlsx, xlsm,'
+                         ' xlsb, odf, ods, odt, and csv.')
+
     # Replace blank values with blank_value
     df.fillna(value=blank_value, inplace=True)
     # Remove any whitespace at the start and end of the column headers
