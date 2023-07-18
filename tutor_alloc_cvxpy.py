@@ -6,9 +6,11 @@ Authors: Liam Timms - liam.timms@uq.edu.au
 
 INSTRUCTIONS
 --- Installation ---
-You may need to install the packages cvxpy. Instructions for doing are on https://www.cvxpy.org/install/index.html
+You need to install the packages cvxpy. Instructions for doing this are on https://www.cvxpy.org/install/index.html
 
 --- The Excel spreadsheet ---
+See example_spreadsheet.xlsx as an example of the required structure for tutors' availabilities and workshop times
+
 Workshop times & column names:
   -   1st column should be called 'Full name'
   -   All other columns should be the workshop times. Workshop times are labelled "Day StartTime-EndTime Suffix"
@@ -96,7 +98,7 @@ def yes_no_question(question_text):
     while answer.lower().strip() not in ['yes', 'no']:
         answer = input("Incorrect input. Enter either 'yes' or 'no':")
 
-    return answer
+    return answer.lower().strip()
 
 
 def find_row_name(substring, df):
@@ -119,7 +121,7 @@ seed(42)
 
 file_name = input('Enter the file name of the tutor workshop availability Excel spreadsheet'
                   ' (including path, use \\\ instead of single \)'
-                  ' \nFor example, "Sem 1 2023 resources\\\SCIE1000_1100_availabilities.xlsx"')
+                  ' \nFor example, "Sem 1 2023 resources\\\SCIE1000_availabilities.xlsx"')
 
 # --------- READING IN THE EXCEL SPREADSHEETS ---------
 # Read in the availabilities spreadsheet as a dataframe, specify 1st sheet
@@ -243,8 +245,7 @@ conflicts = yes_no_question("Are there any tutor conflicts (yes/no):")
 
 if conflicts.lower() == 'yes':
     # Read in the tutor conflicts
-    workshop_conflict_df = read_excel('Sem 1 2023 resources\\SCIE1000_1100_availabilities.xlsx',
-                                      sheet_name='Conflicts')
+    workshop_conflict_df = read_excel(file_name, sheet_name='Conflicts')
 
     # Create list of tutor conflicts. Each element will be a list [Tutor 0, Tutor 1]
     C_ij = [  # List of the tutors in conflict given in row k of Excel sheet
@@ -252,12 +253,13 @@ if conflicts.lower() == 'yes':
         for k in workshop_conflict_df.index]
 
 # Are there any SCIE1100 workshops to schedule?
-do_scie1100 = yes_no_question("Are you scheduling SCIE1100 as well as SCIE1000? (yes/no)")
+if yes_no_question("Are you scheduling SCIE1000? (yes/no)") == 'yes':
+    do_scie1100 = yes_no_question("Are you scheduling SCIE1100 as well as SCIE1000? (yes/no)")
 
 # Determine weighting for gender diversity in the objective function
 weight = float(input("What is the weighting (w) for gender diverse tutoring allocations?\n"
                      "0 < w < 1 means that tutors' workshop preferences are weighted more than gender diversity."
-                     " Conversely for w > 1. \n"
+                     " Conversely, w > 1 means gender diversity is weighted more. \n"
                      "Enter value of w: "))
 if weight < 0:
     weight = 0
@@ -308,12 +310,12 @@ constraints = []
 # Each workshop must have correct number of tutors teaching it
 constraints += [sum(X_iw[i, w] for i in Tutors if (i, w) in X_iw) == N_w[w] for w in Workshops]
 
-if do_scie1100.lower() == 'no':
+if do_scie1100 == 'no':
     # Make sure each tutor is allocated the correct number of workshops for SCIE1000
     # M_i[i] will only have one element, since only SCIE1000 is being run this semester.
     constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw) == M_i[i][0] for i in Tutors]
 
-elif do_scie1100.lower() == 'yes':
+elif do_scie1100 == 'yes':
     # Make sure each tutor is allocated the correct number of workshops for SCIE1000
     # M_i[i] has two elements: M_i[i][0] -> SCIE1000, M_i[i][1] -> SCIE1100
     constraints += [sum(X_iw[i, w] for w in Workshops if (i, w) in X_iw if '1100' not in Time_slots[w]) == M_i[i][0]
@@ -388,7 +390,7 @@ for (i, j, k, w) in Z_ijkw:
 problem = cp.Problem(objective, constraints)
 problem.solve()
 #
-# # Save the results as a dataframe. For each workshop, mark the allocated tutors with an X_iw.
+# # Save the results as a dataframe. For each workshop, mark the allocated tutors with an X.
 results_df = DataFrame(index=np.array(Tutors), columns=np.array(Time_slots))
 for (i, w) in X_iw:
     if X_iw[i, w].value > 0.9:
@@ -396,4 +398,4 @@ for (i, w) in X_iw:
         results_df.loc[i, Time_slots[w]] = 'X'
 
 # Export the allocation dataframe to an Excel file
-# results_df.to_excel('tutor_workshop_schedule_cvxpy.xlsx', sheet_name='Timetable', index=True)
+results_df.to_excel('tutor_workshop_schedule.xlsx', sheet_name='Timetable', index=True)
