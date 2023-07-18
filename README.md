@@ -8,6 +8,7 @@ They reads in data from a user-provided Excel spreadsheet, and is set up so the 
 
 INSTRUCTIONS FOR CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
 Supported spreasheet file types are xls, xlsx, xlsm, xlsb, odf, ods, odt, and csv.
+example_spreadsheet.xlsx provides a template/example of the availability spreadsheet.
 
 Workshop times & column names:
   -   1st column should be called 'Full name'
@@ -42,7 +43,7 @@ Spreadsheet sheets
   -   The third sheet is named 'Conflicts'. There are two columns of entries, labelled 'Tutor 1' and 'Tutor 2'.
       Each row after that contains pairs of tutors that cannot be in the same workshop.
 
-Debugging
+Debugging (will fix this in future update)
   -   If you run the program and the result it "Unable to retrieve attribute 'x'", then the timetable is infeasible.
       Try commenting out the last constraint and run the program again. If it's still infeasible, uncomment that
       constraint and comment out the second last constraint. Repeat until the program is feasible - the constraint you
