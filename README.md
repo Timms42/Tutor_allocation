@@ -1,14 +1,19 @@
-# Tutor_allocation
+# Allocating tutors to course tutorials
 Program and mathematical model for optimal allocation of university tutors to course tutorials.
+
+tutor_alloc_gurobi.py and tutor_alloc_cvxpy.py implement a mixed-integer programming model for optimal tutor-workshop allocations, using Gurobi and CVXPY (open source) as solvers, respectively.
+They read in data from a user-provided Excel spreadsheet, and are set up so the user is not required to interact with the underlying mathematical model.
 
 Tutor_allocation_model.pdf describes the mixed-integer mathematical program that underpins the allocation code.
 
-tutor_alloc_gurobi.py and tutor_alloc_cvxpy.py implement a mixed-integer programming model for optimal tutor-workshop allocations, using Gurobi and CVXPY (open source) as solvers, respectively.
-They reads in data from a user-provided Excel spreadsheet, and is set up so the user is not required to understand or interact with the underlying mathematical model.
+example_spreadsheet.xlsx provides a template/example of the spreadsheet containing tutor availabilities, workshop times, and tutor conflicts.
 
-INSTRUCTIONS FOR CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
+### Getting started
+To allocate your tutors, download either tutor_alloc_cvxpy.py (open-source solver) or tutor_alloc_gurobi (if you have Gurobi). Create a spreadsheet of tutor availabilities, workshop times, and tutor conflicts in the same format as example_spreadsheet (detailed instructions below). Then you can run the program and it will allocate your tutors!
+
+### CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
 Supported spreasheet file types are xls, xlsx, xlsm, xlsb, odf, ods, odt, and csv.
-example_spreadsheet.xlsx provides a template/example of the availability spreadsheet.
+
 
 Workshop times & column names:
   -   1st column should be called 'Full name'
