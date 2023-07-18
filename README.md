@@ -9,11 +9,13 @@ Tutor_allocation_model.pdf describes the mixed-integer mathematical program that
 example_spreadsheet.xlsx provides a template/example of the spreadsheet containing tutor availabilities, workshop times, and tutor conflicts.
 
 ### Getting started
-To allocate your tutors, download either tutor_alloc_cvxpy.py (open-source solver) or tutor_alloc_gurobi (if you have Gurobi). Create a spreadsheet of tutor availabilities, workshop times, and tutor conflicts in the same format as example_spreadsheet (detailed instructions below). Then you can run the program and it will allocate your tutors!
+To allocate your tutors, download either tutor_alloc_cvxpy.py (recommended, open-source) or tutor_alloc_gurobi (if you have a paid license for Gurobi). Create a spreadsheet of tutor availabilities, workshop times, and tutor conflicts in the same format as example_spreadsheet (detailed instructions below).
+
+If you're using the cvxpy file then you will need to install the cvxpy package. See https://www.cvxpy.org/install/index.html for instructions.
+Then you can run tutor_alloc_cvxpy.py in a Python installation and it will allocate your tutors!
 
 ### Creating the spreadsheet of availabilities
 Supported spreasheet file types are xls, xlsx, xlsm, xlsb, odf, ods, odt, and csv.
-
 
 Workshop times & column names:
   -   1st column should be called 'Full name'
