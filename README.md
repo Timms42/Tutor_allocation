@@ -11,7 +11,7 @@ example_spreadsheet.xlsx provides a template/example of the spreadsheet containi
 ### Getting started
 To allocate your tutors, download either tutor_alloc_cvxpy.py (open-source solver) or tutor_alloc_gurobi (if you have Gurobi). Create a spreadsheet of tutor availabilities, workshop times, and tutor conflicts in the same format as example_spreadsheet (detailed instructions below). Then you can run the program and it will allocate your tutors!
 
-### CREATING THE EXCEL SPREADSHEET OF AVAILABILITIES
+### Creating the spreadsheet of availabilities
 Supported spreasheet file types are xls, xlsx, xlsm, xlsb, odf, ods, odt, and csv.
 
 
